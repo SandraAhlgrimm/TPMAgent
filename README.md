@@ -41,7 +41,3 @@ TPMAgent aims to:
 ## Getting Started
 
 *Instructions for setup, usage, and contributing will be added as the project evolves.*
-
----
-
-*This project is in early development. Contributions and feedback are welcome!*
