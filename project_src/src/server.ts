@@ -1,25 +1,23 @@
 #!/usr/bin/env node
 
 import express from 'express';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse';
 import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@modelcontextprotocol/sdk/types';
 import * as dotenv from 'dotenv';
-import { createLogger, LogLevel } from './utils/logger.js';
-import { loadConfig } from './config/index.js';
-import { readExistingTools, MCPTool } from './tools/project-tools.js';
-import Ajv from 'ajv';
+import { createLogger, LogLevel } from './utils/logger';
+import { loadConfig } from './config/index';
+import { initializeTools, handleListTools, handleCallTool } from './tools/index';
 
 // Load environment variables
 dotenv.config();
 
 const logger = createLogger('mcp-sse-server');
-const ajv = new Ajv();
 
 // Global server instances tracking
 const activeTransports = new Set<SSEServerTransport>();
@@ -55,80 +53,21 @@ function createMCPServer(config: any) {
  * Register MCP request handlers
  */
 function registerHandlers(server: Server) {
+  // Initialize tools
+  initializeTools();
+  
   // List available tools
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
+  server.setRequestHandler(ListToolsRequestSchema, async (request) => {
     logger.debug('Received list tools request');
-    
-    const tools = await readExistingTools();
-    
-    return {
-      tools: tools.map((tool: MCPTool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-      })),
-    };
+    return await handleListTools(request);
   });
 
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    const { name } = request.params;
+    logger.info('Tool call received', { toolName: name });
     
-    logger.info('Tool call received', { toolName: name, args });
-
-    try {
-      const tools = await readExistingTools();
-      const tool = tools.find((t: MCPTool) => t.name === name);
-      
-      if (!tool) {
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-      }
-
-      // Validate arguments against the tool's schema using AJV
-      let validationResult: { success: boolean; data?: any; error?: any };
-      if (tool.inputSchema) {
-        const validate = ajv.compile(tool.inputSchema);
-        const valid = validate(args);
-        if (!valid) {
-          const errorMessage = validate.errors?.map(e => `${e.instancePath || e.schemaPath}: ${e.message}`).join(', ') || 'Validation failed';
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            `Invalid parameters: ${errorMessage}`
-          );
-        }
-        validationResult = { success: true, data: args };
-      } else {
-        validationResult = { success: true, data: args };
-      }
-
-      // Execute the tool
-      const result = await tool.handler(validationResult.data);
-      
-      logger.info('Tool executed successfully', { toolName: name });
-      
-      return {
-        content: [
-          {
-            type: 'text',
-            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      logger.error('Tool execution failed', { 
-        toolName: name, 
-        error: error instanceof Error ? error.message : String(error) 
-      });
-      
-      if (error instanceof McpError) {
-        throw error;
-      }
-      
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Tool execution failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+    return await handleCallTool(request);
   });
 
   logger.info('MCP request handlers registered');
