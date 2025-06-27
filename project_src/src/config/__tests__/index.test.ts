@@ -21,6 +21,12 @@ describe('SSE Config Loader', () => {
     delete process.env.MCP_HOST;
     delete process.env.LOG_LEVEL;
     delete process.env.SERVICE_NAME;
+    delete process.env.GITHUB_TOKEN;
+    delete process.env.GITHUB_PAT;
+    delete process.env.GITHUB_USER_AGENT;
+    delete process.env.GITHUB_API_URL;
+    delete process.env.GITHUB_MAX_RETRIES;
+    delete process.env.GITHUB_RETRY_DELAY;
   });
 
   it('should load default configuration when no file exists', () => {
