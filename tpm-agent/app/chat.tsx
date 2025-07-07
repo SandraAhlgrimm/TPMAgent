@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from "react";
-import { streamChatCompletion } from "./lib/azure-openai";
+import { createAgent, streamAgentConversation, deleteAgent } from "./lib/azure-agents";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -19,16 +19,75 @@ export default function Chat() {
   const [currentMessage, setCurrentMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentId, setAgentId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('agentId');
+    }
+    return null;
+  });
   const chatLogRef = useRef<HTMLDivElement>(null);
 
-  const clearChatHistory = () => {
+  // Initialize agent on component mount
+  useEffect(() => {
+    const initializeAgent = async () => {
+      if (!agentId) {
+        try {
+          console.log('Creating new agent...');
+          const agent = await createAgent(
+            "Chat Assistant",
+            "You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions."
+          );
+          console.log('Agent created:', agent);
+          setAgentId(agent.id);
+          localStorage.setItem('agentId', agent.id);
+          console.log('Agent created with ID:', agent.id);
+        } catch (error) {
+          console.error('Failed to create agent:', error);
+          setError('Failed to initialize chat agent. Please refresh the page.');
+        }
+      }
+    };
+
+    initializeAgent();
+  }, [agentId]);
+
+  const clearChatHistory = async () => {
     setMessages([]);
     setError(null);
     localStorage.removeItem('chatMessages');
+    
+    // Delete current agent and create a new one
+    if (agentId) {
+      try {
+        await deleteAgent(agentId);
+        localStorage.removeItem('agentId');
+        setAgentId(null);
+      } catch (error) {
+        console.error('Failed to delete agent:', error);
+      }
+    }
+  };
+
+  const createNewAgent = async () => {
+    try {
+      setError(null);
+      console.log('Creating new agent...');
+      const agent = await createAgent(
+        "Chat Assistant",
+        "You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions."
+      );
+      console.log('Agent created:', agent);
+      setAgentId(agent.id);
+      localStorage.setItem('agentId', agent.id);
+      console.log('Agent created with ID:', agent.id);
+    } catch (error) {
+      console.error('Failed to create agent:', error);
+      setError('Failed to create chat agent. Please try again.');
+    }
   };
 
   const handleSend = async () => {
-    if (currentMessage.trim() && !isLoading) {
+    if (currentMessage.trim() && !isLoading && agentId) {
       const userMessage: Message = { role: 'user', content: currentMessage };
       setMessages(prev => [...prev, userMessage]);
       setCurrentMessage("");
@@ -40,7 +99,7 @@ export default function Chat() {
         const assistantMessage: Message = { role: 'assistant', content: '' };
         setMessages(prev => [...prev, assistantMessage]);
 
-        const stream = streamChatCompletion([...messages, userMessage]);
+        const stream = streamAgentConversation(agentId, userMessage.content);
         
         for await (const chunk of stream) {
           setMessages(prev => {
@@ -92,13 +151,26 @@ export default function Chat() {
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* Header with Clear Button */}
       <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Chat</h1>
-        <button
-          onClick={clearChatHistory}
-          className="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
-        >
-          Clear History
-        </button>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">AI Agent Chat</h1>
+          {agentId && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">Agent ID: {agentId.slice(0, 8)}...</p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={createNewAgent}
+            className="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+          >
+            {agentId ? 'Recreate Agent' : 'Create Agent'}
+          </button>
+          <button
+            onClick={clearChatHistory}
+            className="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+          >
+            Clear History
+          </button>
+        </div>
       </div>
 
       {/* Error Banner */}
@@ -116,9 +188,19 @@ export default function Chat() {
       
       {/* Chat Log */}
       <div ref={chatLogRef} className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.length === 0 ? (
+        {!agentId ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 space-y-4">
+            <p>No AI agent initialized.</p>
+            <button
+              onClick={createNewAgent}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+            >
+              Create New Agent
+            </button>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-            <p>Start a conversation by typing a message below.</p>
+            <p>Start a conversation with your AI agent by typing a message below.</p>
           </div>
         ) : (
           messages.map((message, index) => (
@@ -128,7 +210,7 @@ export default function Chat() {
                 : 'bg-white dark:bg-gray-800'
             }`}>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">
-                {message.role}
+                {message.role === 'assistant' ? 'AI Agent' : 'You'}
               </div>
               <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">
                 {message.content}
@@ -139,7 +221,7 @@ export default function Chat() {
         {isLoading && (
           <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm max-w-2xl">
             <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-              Assistant
+              AI Agent
             </div>
             <div className="text-gray-600 dark:text-gray-400">
               Thinking...
@@ -167,10 +249,10 @@ export default function Chat() {
           />
           <button
             onClick={handleSend}
-            disabled={isLoading}
+            disabled={isLoading || !agentId}
             className="px-6 py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-lg font-medium transition-colors"
           >
-            {isLoading ? 'Sending...' : 'Send'}
+            {!agentId ? 'Initializing...' : isLoading ? 'Sending...' : 'Send'}
           </button>
         </div>
       </div>
