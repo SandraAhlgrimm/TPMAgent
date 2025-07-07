@@ -98,15 +98,17 @@ export default function Chat() {
         // Add empty assistant message that will be filled as stream arrives
         const assistantMessage: Message = { role: 'assistant', content: '' };
         setMessages(prev => [...prev, assistantMessage]);
-
+        
+        let accumulatedContent = '';
         const stream = streamAgentConversation(agentId, userMessage.content);
         
         for await (const chunk of stream) {
+          accumulatedContent += chunk;
           setMessages(prev => {
             const newMessages = [...prev];
             const lastMessage = newMessages[newMessages.length - 1];
             if (lastMessage.role === 'assistant') {
-              lastMessage.content += chunk;
+              lastMessage.content = accumulatedContent; // Set the full content instead of appending
             }
             return newMessages;
           });
@@ -119,7 +121,7 @@ export default function Chat() {
         // Remove the empty assistant message and add error message
         setMessages(prev => {
           const newMessages = [...prev];
-          if (newMessages[newMessages.length - 1]?.role === 'assistant' && newMessages[newMessages.length - 1]?.content === '') {
+          if (newMessages[newMessages.length - 1]?.role === 'assistant') {
             newMessages.pop();
           }
           return [...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }];
