@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createAgent, streamAgentConversation, deleteAgent } from "./lib/azure-agents";
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -214,8 +215,43 @@ export default function Chat() {
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize">
                 {message.role === 'assistant' ? 'AI Agent' : 'You'}
               </div>
-              <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200">
-                {message.content}
+              <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200 dark:prose-invert">
+                <ReactMarkdown
+                  components={{
+                    // Customize code blocks
+                    code: ({ className, children, ...props }) => {
+                      const isInline = !className || !className.includes('language-');
+                      return isInline ? (
+                        <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm" {...props}>
+                          {children}
+                        </code>
+                      ) : (
+                        <pre className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg overflow-x-auto">
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        </pre>
+                      );
+                    },
+                    // Customize links
+                    a: ({ href, children }) => (
+                      <a 
+                        href={href} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {children}
+                      </a>
+                    ),
+                    // Customize paragraphs to preserve spacing
+                    p: ({ children }) => (
+                      <p className="mb-2 last:mb-0">{children}</p>
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </div>
             </div>
           ))
