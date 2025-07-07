@@ -3,6 +3,7 @@
 import { useSession, signIn, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import Image from "next/image"
+import { useRepository } from "./context/repository"
 
 interface Repository {
   id: number
@@ -19,6 +20,7 @@ interface Repository {
 
 export default function Repo() {
   const { data: session, status } = useSession()
+  const { selectedRepository, setSelectedRepository } = useRepository()
   const [mcpResponse, setMcpResponse] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [repositories, setRepositories] = useState<Repository[]>([])
@@ -185,7 +187,13 @@ export default function Repo() {
             <div className="h-156 overflow-y-auto">
               <div className="space-y-3">
                 {repositories.map((repo) => (
-                <div key={repo.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <div 
+                  key={repo.id} 
+                  className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${
+                    selectedRepository?.id === repo.id ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600' : ''
+                  }`}
+                  onClick={() => setSelectedRepository(repo)}
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
