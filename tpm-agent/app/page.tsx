@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Chat from "./chat";
 import Repo from "./repo";
+import RepoIssues from "./repo-issues";
 import { useRepository } from "./context/repository";
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'repo' | 'chat'>('repo');
+  const [currentView, setCurrentView] = useState<'repo' | 'chat' | 'repo-issues'>('repo');
   const { selectedRepository } = useRepository();
 
   return (
@@ -24,6 +25,16 @@ export default function Home() {
               }`}
             >
               Repo
+            </button>
+            <button
+              onClick={() => setCurrentView('repo-issues')}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                currentView === 'repo-issues'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              Repo Issues
             </button>
             <button
               onClick={() => setCurrentView('chat')}
@@ -52,6 +63,7 @@ export default function Home() {
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         {currentView === 'repo' && <Repo />}
+        {currentView === 'repo-issues' && <RepoIssues />}
         {currentView === 'chat' && <Chat />}
       </div>
     </div>

@@ -25,6 +25,7 @@ export default function Repo() {
   const [loading, setLoading] = useState(false)
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [reposLoading, setReposLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const testMCP = async () => {
     if (!session) return
@@ -78,6 +79,11 @@ export default function Repo() {
     }
   }, [session])
 
+  const filteredRepositories = repositories.filter(repo =>
+    repo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    repo.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center h-full">
@@ -129,7 +135,7 @@ export default function Repo() {
         
         <button
           onClick={() => signOut()}
-          className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
         >
           Sign out
         </button>
@@ -175,6 +181,16 @@ export default function Repo() {
             </button>
           </div>
           
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search repositories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          
           {reposLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="text-gray-600 dark:text-gray-400">Loading repositories...</div>
@@ -183,10 +199,14 @@ export default function Repo() {
             <div className="text-center py-8 text-gray-600 dark:text-gray-400">
               No repositories with write access found
             </div>
+          ) : filteredRepositories.length === 0 ? (
+            <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+              No repositories match your search
+            </div>
           ) : (
             <div className="h-156 overflow-y-auto">
               <div className="space-y-3">
-                {repositories.map((repo) => (
+                {filteredRepositories.map((repo) => (
                 <div 
                   key={repo.id} 
                   className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${
