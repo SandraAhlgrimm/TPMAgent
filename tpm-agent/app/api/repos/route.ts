@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "../auth/[...nextauth]/route"
 
@@ -24,7 +24,7 @@ export async function GET() {
     const repos = await response.json()
     
     // Filter repositories with write access
-    const writableRepos = repos.filter((repo: any) => 
+    const writableRepos = repos.filter((repo: { permissions?: { push?: boolean; admin?: boolean }; owner?: { login?: string } }) => 
       repo.permissions?.push || repo.permissions?.admin || repo.owner?.login === session.user?.name
     )
 

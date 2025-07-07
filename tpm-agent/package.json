@@ -9,8 +9,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@azure/identity": "^4.10.2",
+    "@azure/openai": "^2.0.0",
     "next": "15.3.5",
     "next-auth": "^4.24.11",
+    "openai": "^5.8.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

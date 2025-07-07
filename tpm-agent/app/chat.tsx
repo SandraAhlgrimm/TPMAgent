@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from "react";
+// import { azureOpenAIClient } from "./lib/azure-openai";
 
 export default function Chat() {
   const [messages, setMessages] = useState<string[]>(() => {
