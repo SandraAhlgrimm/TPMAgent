@@ -3,17 +3,27 @@
 import { useState, useEffect, useRef } from "react";
 import { createAgent, streamAgentConversation, deleteAgent } from "./lib/azure-agents";
 import ReactMarkdown from 'react-markdown';
+import { useToast } from './utils/toast';
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
 }
 
 export default function Chat() {
+  const { showToast } = useToast();
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chatMessages');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const parsedMessages = JSON.parse(saved);
+        // Add IDs to messages that don't have them (backward compatibility)
+        return parsedMessages.map((msg: any, index: number) => ({
+          ...msg,
+          id: msg.id || `legacy-${index}-${Date.now()}`
+        }));
+      }
     }
     return [];
   });
@@ -49,8 +59,13 @@ export default function Chat() {
       }
     };
 
-    initializeAgent();
-  }, [agentId]);
+    // Use a ref to prevent double execution in strict mode
+    let isInitialized = false;
+    if (!isInitialized && !agentId) {
+      isInitialized = true;
+      initializeAgent();
+    }
+  }, []);
 
   const clearChatHistory = async () => {
     setMessages([]);
@@ -72,6 +87,23 @@ export default function Chat() {
   const createNewAgent = async () => {
     try {
       setError(null);
+      
+      // Delete previous agent if it exists
+      if (agentId) {
+        console.log(`Attempting to delete agent with ID: ${agentId}`);
+        try {
+          await deleteAgent(agentId);
+          console.log(`Successfully deleted agent with ID: ${agentId}`);
+          localStorage.removeItem('agentId');
+          setAgentId(null);
+          showToast('Previous agent deleted successfully', 'success');
+        } catch (deleteError) {
+          console.error('Failed to delete previous agent:', deleteError);
+          showToast(`Failed to delete previous agent: ${deleteError instanceof Error ? deleteError.message : 'Unknown error'}`, 'error');
+          return;
+        }
+      }
+      
       console.log('Creating new agent...');
       const agent = await createAgent(
         "Chat Assistant",
@@ -81,15 +113,22 @@ export default function Chat() {
       setAgentId(agent.id);
       localStorage.setItem('agentId', agent.id);
       console.log('Agent created with ID:', agent.id);
+      showToast('Agent created successfully', 'success');
     } catch (error) {
       console.error('Failed to create agent:', error);
-      setError('Failed to create chat agent. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Failed to create chat agent: ${errorMessage}`);
+      showToast(`Failed to create agent: ${errorMessage}`, 'error');
     }
   };
 
   const handleSend = async () => {
     if (currentMessage.trim() && !isLoading && agentId) {
-      const userMessage: Message = { role: 'user', content: currentMessage };
+      const userMessage: Message = { 
+        id: `user-${Date.now()}-${Math.random()}`,
+        role: 'user', 
+        content: currentMessage 
+      };
       setMessages(prev => [...prev, userMessage]);
       setCurrentMessage("");
       setIsLoading(true);
@@ -97,7 +136,11 @@ export default function Chat() {
 
       try {
         // Add empty assistant message that will be filled as stream arrives
-        const assistantMessage: Message = { role: 'assistant', content: '' };
+        const assistantMessage: Message = { 
+          id: `assistant-${Date.now()}-${Math.random()}`,
+          role: 'assistant', 
+          content: '' 
+        };
         setMessages(prev => [...prev, assistantMessage]);
         
         let accumulatedContent = '';
@@ -125,7 +168,11 @@ export default function Chat() {
           if (newMessages[newMessages.length - 1]?.role === 'assistant') {
             newMessages.pop();
           }
-          return [...newMessages, { role: 'assistant', content: `Error: ${errorMessage}` }];
+          return [...newMessages, { 
+            id: `error-${Date.now()}-${Math.random()}`,
+            role: 'assistant', 
+            content: `Error: ${errorMessage}` 
+          }];
         });
       } finally {
         setIsLoading(false);
@@ -206,8 +253,8 @@ export default function Chat() {
             <p>Start a conversation with your AI agent by typing a message below.</p>
           </div>
         ) : (
-          messages.map((message, index) => (
-            <div key={index} className={`p-3 rounded-lg shadow-sm max-w-2xl ${
+          messages.map((message) => (
+            <div key={message.id} className={`p-3 rounded-lg shadow-sm max-w-2xl ${
               message.role === 'user' 
                 ? 'bg-blue-100 dark:bg-blue-900 ml-auto' 
                 : 'bg-white dark:bg-gray-800'
