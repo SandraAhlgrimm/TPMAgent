@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { AgentsClient, RunStreamEvent, MessageStreamEvent, DoneEvent, ErrorEvent, isOutputOfType, ToolUtility } from "@azure/ai-agents";
 import { DefaultAzureCredential } from "@azure/identity";
 import type { MessageDeltaChunk, MessageDeltaTextContent, MessageTextContent, ThreadRun } from "@azure/ai-agents";
+import { authOptions } from "../auth/[...nextauth]/route";
+import { getServerSession } from "next-auth"
 
 const modelDeploymentName = process.env.MODEL_DEPLOYMENT_NAME || "gpt-4o";
 const projectEndpoint = process.env.PROJECT_ENDPOINT;
+const gitHubMCPServerLabel = "GitHub MCP Server"; // double-check this label
+const gitHubMCPUrl = "https://mcp.github.com"; // double-check this URL
 
 // Validate required environment variables
 if (!projectEndpoint) {
@@ -21,7 +25,7 @@ interface CreateAgentRequest {
 }
 
 // Create an agent with optional file attachment
-export async function createAgent(name: string = "my-agent", instructions: string = "You are a helpful assistant", fileId?: string) {
+export async function createAgent(name: string, instructions: string, fileId?: string) {
   if (!client) {
     throw new Error('AgentsClient not initialized. Check PROJECT_ENDPOINT environment variable.');
   }
@@ -39,8 +43,11 @@ export async function createAgent(name: string = "my-agent", instructions: strin
     // If a file is provided, create code interpreter tool
     if (fileId) {
       const codeInterpreterTool = ToolUtility.createCodeInterpreterTool([fileId]);
-      agentConfig.tools = [codeInterpreterTool.definition];
-      agentConfig.toolResources = codeInterpreterTool.resources;
+      
+      // MCP Tool Setup not yet supported in the SDK, using structured type
+      const gitHubMCPTool = gitHubToolAgentSetup();
+      agentConfig.tools = [gitHubMCPTool];
+      // agentConfig.toolResources = codeInterpreterTool.resources;
     }
 
     const agent = await client.createAgent(modelDeploymentName, agentConfig);
@@ -52,6 +59,33 @@ export async function createAgent(name: string = "my-agent", instructions: strin
   }
 }
 
+function gitHubToolAgentSetup() {
+  return {
+    type: "mcp",
+    server_label: gitHubMCPServerLabel,
+    server_url: gitHubMCPUrl,
+    required_approval: "never",
+  };
+}
+
+// according to the docs, this is passed at the run creation level. Should try passing it to the agent.
+async function gitHubToolResouceSetup() {
+  const session = await getServerSession(authOptions)
+  
+  if (!session?.accessToken) {
+    throw new Error("No GitHub access token available")
+  }
+
+  return [
+      {
+        server_label: gitHubMCPServerLabel,
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+        }
+      }
+    ]
+}
+
 // Create a thread and run a conversation
 export async function runConversation(agentId: string, message: string) {
   if (!client) {
@@ -59,8 +93,11 @@ export async function runConversation(agentId: string, message: string) {
   }
 
   try {
-    // Create a thread
-    const thread = await client.threads.create();
+    // Create a thread with tool resources
+    const toolResources: any = { mcp: await gitHubToolResouceSetup() };
+    const thread = await client.threads.create({
+      toolResources: toolResources
+    });
     console.log(`Created thread, thread ID: ${thread.id}`);
 
     // Create a message

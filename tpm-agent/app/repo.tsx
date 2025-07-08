@@ -27,6 +27,22 @@ export default function Repo() {
   const [reposLoading, setReposLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
+  // Simple hash function to generate consistent colors for languages
+  const getLanguageColor = (language: string) => {
+    let hash = 0
+    for (let i = 0; i < language.length; i++) {
+      hash = language.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 
+      'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
+      'bg-orange-500', 'bg-cyan-500', 'bg-lime-500', 'bg-rose-500'
+    ]
+    
+    return colors[Math.abs(hash) % colors.length]
+  }
+
   const testMCP = async () => {
     if (!session) return
     
@@ -141,8 +157,8 @@ export default function Repo() {
         </button>
       </div>
 
-      <div className="space-y-6 flex-1 flex flex-col">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+      <div className="flex-1 flex flex-col gap-6 min-h-0">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm shrink-0">
           <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
             GitHub MCP Server Test
           </h2>
@@ -168,7 +184,7 @@ export default function Repo() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm flex-1 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 shrink-0">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Your Repositories (Write Access)
             </h2>
@@ -181,7 +197,7 @@ export default function Repo() {
             </button>
           </div>
           
-          <div className="mb-4">
+          <div className="mb-4 shrink-0">
             <input
               type="text"
               placeholder="Search repositories..."
@@ -191,69 +207,71 @@ export default function Repo() {
             />
           </div>
           
-          {reposLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-gray-600 dark:text-gray-400">Loading repositories...</div>
-            </div>
-          ) : repositories.length === 0 ? (
-            <div className="text-center py-8 text-gray-600 dark:text-gray-400">
-              No repositories with write access found
-            </div>
-          ) : filteredRepositories.length === 0 ? (
-            <div className="text-center py-8 text-gray-600 dark:text-gray-400">
-              No repositories match your search
-            </div>
-          ) : (
-            <div className="h-156 overflow-y-auto">
-              <div className="space-y-3">
-                {filteredRepositories.map((repo) => (
-                <div 
-                  key={repo.id} 
-                  className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${
-                    selectedRepository?.id === repo.id ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600' : ''
-                  }`}
-                  onClick={() => setSelectedRepository(repo)}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <a
-                          href={repo.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-                        >
-                          {repo.full_name}
-                        </a>
-                        {repo.private && (
-                          <span className="px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded">
-                            Private
-                          </span>
-                        )}
-                      </div>
-                      {repo.description && (
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
-                          {repo.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
-                        {repo.language && (
-                          <span className="flex items-center gap-1">
-                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                            {repo.language}
-                          </span>
-                        )}
-                        <span>⭐ {repo.stargazers_count}</span>
-                        <span>🍴 {repo.forks_count}</span>
-                        <span>Updated {new Date(repo.updated_at).toLocaleDateString()}</span>
+          <div className="flex-1 min-h-0">
+            {reposLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-600 dark:text-gray-400">Loading repositories...</div>
+              </div>
+            ) : repositories.length === 0 ? (
+              <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+                No repositories with write access found
+              </div>
+            ) : filteredRepositories.length === 0 ? (
+              <div className="text-center py-8 text-gray-600 dark:text-gray-400">
+                No repositories match your search
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-3">
+                  {filteredRepositories.map((repo) => (
+                    <div 
+                      key={repo.id} 
+                      className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${
+                        selectedRepository?.id === repo.id ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600' : ''
+                      }`}
+                      onClick={() => setSelectedRepository(repo)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <a
+                              href={repo.html_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                            >
+                              {repo.full_name}
+                            </a>
+                            {repo.private && (
+                              <span className="px-2 py-1 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded">
+                                Private
+                              </span>
+                            )}
+                          </div>
+                          {repo.description && (
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">
+                              {repo.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+                            {repo.language && (
+                              <span className="flex items-center gap-1">
+                                <div className={`w-3 h-3 rounded-full ${getLanguageColor(repo.language)}`}></div>
+                                {repo.language}
+                              </span>
+                            )}
+                            <span>⭐ {repo.stargazers_count}</span>
+                            <span>🍴 {repo.forks_count}</span>
+                            <span>Updated {new Date(repo.updated_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

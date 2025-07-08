@@ -5,6 +5,9 @@ interface Message {
   content: string;
 }
 
+// https://learn.microsoft.com/en-gb/azure/ai-foundry/agents/how-to/tools/model-context-protocol-samples
+// Base on the documenation for the Model Context Protocol (MCP) used by Azure AI Agents, we need to 
+// add support to GitHub's official MCP server
 export async function createAgent(name?: string, instructions?: string, fileId?: string) {
   try {
     const response = await fetch('/api/agents', {
