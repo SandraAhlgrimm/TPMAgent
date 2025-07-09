@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AzureOpenAI } from "openai";
+import { logger } from "@/app/lib/logger";
 
 const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
 const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-11-20";
@@ -8,11 +9,11 @@ const apiKey = process.env.AZURE_OPENAI_API_KEY;
 
 // Validate required environment variables
 if (!endpoint) {
-  console.error('AZURE_OPENAI_ENDPOINT environment variable is required but not set');
+  logger.error('AZURE_OPENAI_ENDPOINT environment variable is required but not set');
 }
 
 if (!apiKey) {
-  console.error('AZURE_OPENAI_API_KEY environment variable is required but not set');
+  logger.error('AZURE_OPENAI_API_KEY environment variable is required but not set');
 }
 
 const aoaiClient = endpoint && apiKey ? new AzureOpenAI({ 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (error) {
-          console.error('Stream error:', error);
+          logger.error('Stream error:', error);
           controller.error(error);
         }
       }
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Azure OpenAI API Error:', error);
+    logger.error('Azure OpenAI API Error:', error);
     
     if (error instanceof Error) {
       if (error.message.includes('401') || error.message.includes('Unauthorized')) {

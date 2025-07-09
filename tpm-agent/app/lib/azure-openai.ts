@@ -7,7 +7,7 @@ interface Message {
 
 export async function* streamChatCompletion(messages: Message[]) {
   try {
-    console.log('Starting chat completion via API route...');
+    console.info('Starting chat completion via API route...');
     
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -41,14 +41,14 @@ export async function* streamChatCompletion(messages: Message[]) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
-              console.log('Stream completed successfully');
+              console.info('Stream completed successfully');
               return;
             }
             
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
-                console.log('Received chunk:', parsed.content);
+                console.debug('Received chunk:', parsed.content);
                 yield parsed.content;
               }
             } catch (e) {
