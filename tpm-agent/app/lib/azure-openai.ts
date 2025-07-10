@@ -1,4 +1,5 @@
 // Client-side Azure OpenAI integration via API routes
+import { logger } from './logger';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -7,7 +8,7 @@ interface Message {
 
 export async function* streamResponses(messages: Message[]) {
   try {
-    console.info('Starting Responses API route...');
+    logger.info('Starting Responses API route...');
     
     const response = await fetch('/api/responses', {
       method: 'POST',
@@ -41,14 +42,14 @@ export async function* streamResponses(messages: Message[]) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
             if (data === '[DONE]') {
-              console.info('Stream completed successfully');
+              logger.info('Stream completed successfully');
               return;
             }
             
             try {
               const parsed = JSON.parse(data);
               if (parsed.content) {
-                console.debug('Received chunk:', parsed.content);
+                logger.debug('Received chunk:', parsed.content);
                 yield parsed.content;
               }
             } catch (e) {
@@ -61,7 +62,7 @@ export async function* streamResponses(messages: Message[]) {
       reader.releaseLock();
     }
   } catch (error) {
-    console.error('Responses error:', error);
+    logger.error('Responses error:', error);
     throw error;
   }
 }
