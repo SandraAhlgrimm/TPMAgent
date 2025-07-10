@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from "react";
-import { streamChatCompletion } from "./lib/azure-openai";
+import { streamResponses } from "./lib/azure-openai";
 import ReactMarkdown from 'react-markdown';
 import { useToast } from './utils/toast';
 
@@ -60,7 +60,7 @@ export default function Chat() {
         setMessages(prev => [...prev, assistantMessage]);
         
         let accumulatedContent = '';
-        const stream = streamChatCompletion([...messages, userMessage]);
+        const stream = streamResponses([...messages, userMessage]);
         
         for await (const chunk of stream) {
           accumulatedContent += chunk;

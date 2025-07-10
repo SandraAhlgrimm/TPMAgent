@@ -5,11 +5,11 @@ interface Message {
   content: string;
 }
 
-export async function* streamChatCompletion(messages: Message[]) {
+export async function* streamResponses(messages: Message[]) {
   try {
-    console.info('Starting chat completion via API route...');
+    console.info('Starting Responses API route...');
     
-    const response = await fetch('/api/chat', {
+    const response = await fetch('/api/responses', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ export async function* streamChatCompletion(messages: Message[]) {
       reader.releaseLock();
     }
   } catch (error) {
-    console.error('Chat completion error:', error);
+    console.error('Responses error:', error);
     throw error;
   }
 }

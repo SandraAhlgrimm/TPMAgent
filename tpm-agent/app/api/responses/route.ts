@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AzureOpenAI } from "openai";
+import { EasyInputMessage } from "openai/resources/responses/responses.mjs";
 import { logger } from "@/app/lib/logger";
 
+// 2025-03-01-preview is the min version with responses API support
+const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2025-03-01-preview";
 const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || "gpt-4o";
-const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-11-20";
 const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
 
@@ -46,9 +48,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const stream = await aoaiClient.chat.completions.create({
+    const stream = await aoaiClient.responses.create({
       model: deployment,
-      messages: messages.map(msg => ({
+      input: messages.map((msg): EasyInputMessage => ({
         role: msg.role,
         content: msg.content
       })),
@@ -63,9 +65,11 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            const content = chunk.choices[0]?.delta?.content || '';
-            if (content) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+            if (chunk.type === 'response.output_text.delta') {
+              const content = chunk.delta || '';
+              if (content) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+              }
             }
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
