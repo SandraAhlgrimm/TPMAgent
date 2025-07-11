@@ -173,6 +173,43 @@ export default function Chat() {
     }
   }, [selectedRepository, lastRepositoryId, lastResponseId, showToast]);
 
+  const saveConversationAsMarkdown = () => {
+    if (messages.length === 0) {
+      showToast('No conversation to save', 'error');
+      return;
+    }
+
+    let markdownContent = '# Chat Conversation\n\n';
+    markdownContent += `*Exported on ${new Date().toLocaleString()}*\n\n`;
+
+    messages.forEach((message) => {
+      if (message.role === 'user') {
+        markdownContent += '############\n';
+        markdownContent += '# User message\n';
+        markdownContent += '############\n\n';
+        markdownContent += message.content + '\n\n';
+      } else {
+        markdownContent += '##########\n';
+        markdownContent += '# AI message\n';
+        markdownContent += '##########\n\n';
+        markdownContent += message.content + '\n\n';
+      }
+    });
+
+    // Create and download the file
+    const blob = new Blob([markdownContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-conversation-${new Date().toISOString().split('T')[0]}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('Conversation saved as markdown', 'success');
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       {/* Header with Clear Button */}
@@ -181,6 +218,12 @@ export default function Chat() {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">AI Chat</h1>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={saveConversationAsMarkdown}
+            className="px-3 py-1 text-sm bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+          >
+            Save as Markdown
+          </button>
           <button
             onClick={clearChatHistory}
             className="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
