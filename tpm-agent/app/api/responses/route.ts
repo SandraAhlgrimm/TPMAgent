@@ -50,25 +50,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { messages }: { messages: Message[] } = await request.json();
+    const { message, previousResponseId }: { message: string, previousResponseId?: string } = await request.json();
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!message) {
       return NextResponse.json(
-        { error: 'Messages array is required' },
+        { error: 'Message is required' },
         { status: 400 }
       );
     }
 
-    // No need to fetch tools manually - the remote MCP server will handle this
-
     const streamConfig: any = {
       model: deployment,
-      input: messages.map((msg): EasyInputMessage => ({
-        role: msg.role,
-        content: msg.content
-      })),
+      input: [{ role: 'user', content: message }],
       stream: true,
     };
+
+    // Add previous response ID for conversation continuity
+    if (previousResponseId) {
+      streamConfig.previous_response_id = previousResponseId;
+    }
 
     // Always add remote MCP server configuration for GitHub integration
     if (session?.accessToken) {
@@ -87,20 +87,29 @@ export async function POST(request: NextRequest) {
 
     // Create a ReadableStream for streaming the response
     const encoder = new TextEncoder();
+    let responseId: string | null = null;
+    
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          // Cast to proper async iterable type
           const asyncIterable = stream as any;
           for await (const chunk of asyncIterable) {
-            if (chunk.type === 'response.output_text.delta') {
-              const content = chunk.delta || '';
-              if (content) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
-              }
+            // Send response ID when we first get it
+            if (chunk.response?.id && !responseId) {
+              responseId = chunk.response.id;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                type: 'response_id', 
+                id: responseId 
+              })}\n\n`));
             }
-            // The remote MCP server integration is handled automatically by the OpenAI API
-            // Tool calls and results will be included in the response stream
+            
+            // Handle text deltas
+            if (chunk.type === 'response.output_text.delta' && chunk.delta) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                type: 'content',
+                content: chunk.delta
+              })}\n\n`));
+            }
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();

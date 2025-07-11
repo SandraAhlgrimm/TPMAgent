@@ -6,7 +6,7 @@ interface Message {
   content: string;
 }
 
-export async function* streamResponses(messages: Message[]) {
+export async function* streamResponses(message: string, previousResponseId?: string): AsyncGenerator<{ type: 'response_id' | 'content', id?: string, content?: string }> {
   try {
     logger.info('Starting Responses API route...');
     
@@ -15,7 +15,7 @@ export async function* streamResponses(messages: Message[]) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ message, previousResponseId }),
     });
 
     if (!response.ok) {
@@ -48,9 +48,12 @@ export async function* streamResponses(messages: Message[]) {
             
             try {
               const parsed = JSON.parse(data);
-              if (parsed.content) {
-                logger.debug('Received chunk:', parsed.content);
-                yield parsed.content;
+              if (parsed.type === 'response_id' && parsed.id) {
+                logger.debug('Received response ID:', parsed.id);
+                yield { type: 'response_id', id: parsed.id };
+              } else if (parsed.type === 'content' && parsed.content) {
+                logger.debug('Received content chunk:', parsed.content);
+                yield { type: 'content', content: parsed.content };
               }
             } catch (e) {
               // Ignore parsing errors for partial chunks

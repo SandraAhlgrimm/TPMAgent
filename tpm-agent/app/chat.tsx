@@ -18,7 +18,6 @@ export default function Chat() {
       const saved = localStorage.getItem('chatMessages');
       if (saved) {
         const parsedMessages = JSON.parse(saved);
-        // Add IDs to messages that don't have them (backward compatibility)
         return parsedMessages.map((msg: any, index: number) => ({
           ...msg,
           id: msg.id || `legacy-${index}-${Date.now()}`
@@ -30,48 +29,65 @@ export default function Chat() {
   const [currentMessage, setCurrentMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastResponseId, setLastResponseId] = useState<string | null>(null);
   const chatLogRef = useRef<HTMLDivElement>(null);
 
   const clearChatHistory = async () => {
     setMessages([]);
     setError(null);
+    setLastResponseId(null);
     localStorage.removeItem('chatMessages');
   };
 
   const handleSend = async () => {
     if (currentMessage.trim() && !isLoading) {
-      const userMessage: Message = { 
-        id: `user-${Date.now()}-${Math.random()}`,
-        role: 'user', 
-        content: currentMessage 
-      };
-      setMessages(prev => [...prev, userMessage]);
       setCurrentMessage("");
       setIsLoading(true);
       setError(null);
 
       try {
-        // Add empty assistant message that will be filled as stream arrives
-        const assistantMessage: Message = { 
-          id: `assistant-${Date.now()}-${Math.random()}`,
+        // Add user message to local state for immediate display
+        const userMessage: Message = { 
+          id: `user-${Date.now()}-${Math.random()}`,
+          role: 'user', 
+          content: currentMessage 
+        };
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Add empty assistant message
+        let assistantMessage: Message = { 
+          id: `temp-${Date.now()}-${Math.random()}`,
           role: 'assistant', 
           content: '' 
         };
         setMessages(prev => [...prev, assistantMessage]);
         
         let accumulatedContent = '';
-        const stream = streamResponses([...messages, userMessage]);
+        const stream = streamResponses(currentMessage, lastResponseId || undefined);
         
         for await (const chunk of stream) {
-          accumulatedContent += chunk;
-          setMessages(prev => {
-            const newMessages = [...prev];
-            const lastMessage = newMessages[newMessages.length - 1];
-            if (lastMessage.role === 'assistant') {
-              lastMessage.content = accumulatedContent; // Set the full content instead of appending
-            }
-            return newMessages;
-          });
+          if (chunk.type === 'response_id' && chunk.id) {
+            // Update with real response ID and save for next request
+            setLastResponseId(chunk.id);
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const lastMessage = newMessages[newMessages.length - 1];
+              if (lastMessage.role === 'assistant') {
+                lastMessage.id = chunk.id!;
+              }
+              return newMessages;
+            });
+          } else if (chunk.type === 'content' && chunk.content) {
+            accumulatedContent += chunk.content;
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const lastMessage = newMessages[newMessages.length - 1];
+              if (lastMessage.role === 'assistant') {
+                lastMessage.content = accumulatedContent;
+              }
+              return newMessages;
+            });
+          }
         }
       } catch (error) {
         console.error('Error getting AI response:', error);
