@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AzureOpenAI } from "openai";
 import { EasyInputMessage } from "openai/resources/responses/responses.mjs";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
 import { logger } from "@/app/lib/logger";
 
 // 2025-03-01-preview is the min version with responses API support
@@ -32,6 +34,15 @@ interface Message {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.accessToken) {
+      return NextResponse.json(
+        { error: 'GitHub authentication required' },
+        { status: 401 }
+      );
+    }
+
     if (!aoaiClient) {
       return NextResponse.json(
         { error: 'Azure OpenAI client not configured. Check environment variables.' },
@@ -48,29 +59,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const stream = await aoaiClient.responses.create({
+    // No need to fetch tools manually - the remote MCP server will handle this
+
+    const streamConfig: any = {
       model: deployment,
       input: messages.map((msg): EasyInputMessage => ({
         role: msg.role,
         content: msg.content
       })),
       stream: true,
-    //   max_tokens: 1000,
-    //   temperature: 1.0,
-    });
+    };
+
+    // Always add remote MCP server configuration for GitHub integration
+    if (session?.accessToken) {
+      streamConfig.tools = [{
+        type: "mcp",
+        server_label: "github_remote_mcp",
+        server_url: "https://api.githubcopilot.com/mcp/",
+        headers: {
+          "Authorization": `Bearer ${session.accessToken}`
+        }
+      }];
+    }
+
+    const stream = await aoaiClient.responses.create(streamConfig);
 
     // Create a ReadableStream for streaming the response
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          for await (const chunk of stream) {
+          // Cast to proper async iterable type
+          const asyncIterable = stream as any;
+          for await (const chunk of asyncIterable) {
             if (chunk.type === 'response.output_text.delta') {
               const content = chunk.delta || '';
               if (content) {
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
               }
             }
+            // The remote MCP server integration is handled automatically by the OpenAI API
+            // Tool calls and results will be included in the response stream
           }
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
