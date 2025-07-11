@@ -76,8 +76,9 @@ export async function POST(request: NextRequest) {
         type: "mcp",
         server_label: "github_remote_mcp",
         server_url: "https://api.githubcopilot.com/mcp/",
+        require_approval: "never",
         headers: {
-          "Authorization": `Bearer ${session.accessToken}`
+          Authorization: `Bearer ${session.accessToken}`
         }
       }];
     }
