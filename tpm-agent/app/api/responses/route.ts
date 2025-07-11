@@ -4,6 +4,8 @@ import { EasyInputMessage } from "openai/resources/responses/responses.mjs";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { logger } from "@/app/lib/logger";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 // 2025-03-01-preview is the min version with responses API support
 const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2025-03-01-preview";
@@ -59,20 +61,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const streamConfig: any = {
+    // Read instructions from markdown file
+    const instructionsPath = join(process.cwd(), 'app', 'config', 'instructions.md');
+    let instructions = '';
+    try {
+      instructions = await readFile(instructionsPath, 'utf-8');
+    } catch (error) {
+      logger.warn('Instructions file not found, proceeding without instructions');
+    }
+
+    const responseCreateParams: any = {
       model: deployment,
       input: [{ role: 'user', content: message }],
       stream: true,
+      instructions
     };
 
     // Add previous response ID for conversation continuity
     if (previousResponseId) {
-      streamConfig.previous_response_id = previousResponseId;
+      responseCreateParams.previous_response_id = previousResponseId;
     }
 
     // Always add remote MCP server configuration for GitHub integration
     if (session?.accessToken) {
-      streamConfig.tools = [{
+      responseCreateParams.tools = [{
         type: "mcp",
         server_label: "github_remote_mcp",
         server_url: "https://api.githubcopilot.com/mcp/",
@@ -83,7 +95,7 @@ export async function POST(request: NextRequest) {
       }];
     }
 
-    const stream = await aoaiClient.responses.create(streamConfig);
+    const stream = await aoaiClient.responses.create(responseCreateParams);
 
     // Create a ReadableStream for streaming the response
     const encoder = new TextEncoder();

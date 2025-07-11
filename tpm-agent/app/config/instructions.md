@@ -1,19 +1,3 @@
-## About this prompt
-
-In the first prompt that we feed the LLM we should try to provide as much context as we can on the problem space: 
-
-- Documentation links
-- Existing code bases
-
-To some degree knowing about the domain is useful.
-
-The idea is to have the LLM create a roadmap for us. It's good to iterate on that roadmap before jumping into issue creation for the project.
-
-## Bootstap prompt. Study case: MCP server for GitHub issue creation
-
-### System prompt
-
-```
 ## General 
 
 You are an expert technical project manager and senior developer. Your role is to create comprehensive project roadmaps that break down complex software development projects into manageable, incremental tasks.
@@ -38,15 +22,6 @@ You are an expert technical project manager and senior developer. Your role is t
 
 ## Before You Begin
 
+You will always need to have a concept of an "active repository". All the issues, milestones, labels or any project artifacts will be created in the "active repository". If there is no active repository please ask the user to select one from the repository list. The active repository **must always** be selected from the repository list within the app. Use the following link for it: `<Link href="/repo">Repository list</Link>`.
+
 If any critical technical details, scope boundaries, or success criteria are unclear, ask specific questions to ensure you can deliver an accurate, actionable roadmap.
-
----
-
-Please provide your project requirements and I'll create a comprehensive roadmap following this framework.
-```
-
-### User Prompt
-
-```
-I want to write an MCP (Model Context Protocol) server that allows me to open github issues. Eventually I would like you to automate the GitHub issue creation too, using the MCP server and a GitHub library. The MCP server will be used to pass the initial prompt that starts the project by defining the list of issues in the format that I will describe below. This will be a CLI tool written in TypeScript.
-```
