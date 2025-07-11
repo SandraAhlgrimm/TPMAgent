@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from "react";
-import { streamResponses } from "./lib/azure-openai";
+import { streamResponses, updateRepositoryContext } from "./lib/azure-openai";
 import ReactMarkdown from 'react-markdown';
 import { useToast } from './utils/toast';
+import { useRepository } from './context/repository';
 
 interface Message {
   id: string;
@@ -13,6 +14,7 @@ interface Message {
 
 export default function Chat() {
   const { showToast } = useToast();
+  const { selectedRepository } = useRepository();
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chatMessages');
@@ -30,12 +32,14 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResponseId, setLastResponseId] = useState<string | null>(null);
+  const [lastRepositoryId, setLastRepositoryId] = useState<number | null>(null);
   const chatLogRef = useRef<HTMLDivElement>(null);
 
   const clearChatHistory = async () => {
     setMessages([]);
     setError(null);
     setLastResponseId(null);
+    setLastRepositoryId(null);
     localStorage.removeItem('chatMessages');
   };
 
@@ -63,7 +67,10 @@ export default function Chat() {
         setMessages(prev => [...prev, assistantMessage]);
         
         let accumulatedContent = '';
-        const stream = streamResponses(currentMessage, lastResponseId || undefined);
+        const stream = streamResponses(
+          currentMessage, 
+          lastResponseId || undefined
+        );
         
         for await (const chunk of stream) {
           if (chunk.type === 'response_id' && chunk.id) {
@@ -128,6 +135,43 @@ export default function Chat() {
   useEffect(() => {
     localStorage.setItem('chatMessages', JSON.stringify(messages));
   }, [messages]);
+
+  // Handle repository changes
+  useEffect(() => {
+    console.log('Repository effect triggered:', {
+      selectedRepository: selectedRepository?.id,
+      lastRepositoryId,
+      hasChanged: selectedRepository && selectedRepository.id !== lastRepositoryId
+    });
+    
+    if (selectedRepository && selectedRepository.id !== lastRepositoryId) {
+      console.log('Updating repository context from', lastRepositoryId, 'to', selectedRepository.id);
+      
+      // Update repository context when it changes
+      updateRepositoryContext(selectedRepository, lastResponseId || undefined)
+        .then((result) => {
+          console.log('Repository context update result:', result);
+          
+          if (result.success) {
+            console.log('Setting lastRepositoryId to:', selectedRepository.id);
+            setLastRepositoryId(selectedRepository.id);
+            // Important: Update lastResponseId with the new response ID from developer message
+            if (result.responseId) {
+              console.log('Updating lastResponseId to:', result.responseId);
+              setLastResponseId(result.responseId);
+            }
+            showToast('Repository context updated', 'success');
+          } else {
+            console.error('Failed to update repository context:', result.error);
+            showToast('Failed to update repository context', 'error');
+          }
+        })
+        .catch((error) => {
+          console.error('Repository context update error:', error);
+          showToast('Failed to update repository context', 'error');
+        });
+    }
+  }, [selectedRepository, lastRepositoryId, lastResponseId, showToast]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">

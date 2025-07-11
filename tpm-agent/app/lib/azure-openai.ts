@@ -6,7 +6,20 @@ interface Message {
   content: string;
 }
 
-export async function* streamResponses(message: string, previousResponseId?: string): AsyncGenerator<{ type: 'response_id' | 'content', id?: string, content?: string }> {
+interface RepositoryContext {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  private: boolean;
+  html_url: string;
+  language: string | null;
+}
+
+export async function* streamResponses(
+  message: string, 
+  previousResponseId?: string
+): AsyncGenerator<{ type: 'response_id' | 'content', id?: string, content?: string }> {
   try {
     logger.info('Starting Responses API route...');
     
@@ -67,5 +80,36 @@ export async function* streamResponses(message: string, previousResponseId?: str
   } catch (error) {
     logger.error('Responses error:', error);
     throw error;
+  }
+}
+
+export async function updateRepositoryContext(
+  repositoryContext: RepositoryContext,
+  previousResponseId?: string
+): Promise<{ success: boolean; responseId?: string; error?: string }> {
+  try {
+    logger.info('Updating repository context...');
+    
+    const response = await fetch('/api/responses', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ repositoryContext, previousResponseId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { success: true, responseId: result.responseId };
+  } catch (error) {
+    logger.error('Repository context update error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
   }
 }

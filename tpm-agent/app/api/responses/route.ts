@@ -168,3 +168,92 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    logger.debug('PUT request received for repository context update');
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.accessToken) {
+      return NextResponse.json(
+        { error: 'GitHub authentication required' },
+        { status: 401 }
+      );
+    }
+
+    if (!aoaiClient) {
+      return NextResponse.json(
+        { error: 'Azure OpenAI client not configured. Check environment variables.' },
+        { status: 500 }
+      );
+    }
+
+    const { repositoryContext, previousResponseId }: { 
+      repositoryContext: {
+        id: number;
+        name: string;
+        full_name: string;
+        description: string | null;
+        private: boolean;
+        html_url: string;
+        language: string | null;
+      },
+      previousResponseId?: string
+    } = await request.json();
+
+    if (!repositoryContext) {
+      logger.warn('Repository context missing in PUT request');
+      return NextResponse.json(
+        { error: 'Repository context is required' },
+        { status: 400 }
+      );
+    }
+
+    logger.info(`Updating repository context for: ${repositoryContext.full_name}`);
+    logger.debug('Repository context details:', repositoryContext);
+
+    const assistantMessage = {
+      role: 'assistant',
+      content: `Active repository has been set to: ${repositoryContext.full_name}
+
+Repository Details:
+- Name: ${repositoryContext.name}
+- Full Name: ${repositoryContext.full_name}
+- Description: ${repositoryContext.description || 'No description available'}
+- Private: ${repositoryContext.private ? 'Yes' : 'No'}
+- Primary Language: ${repositoryContext.language || 'Not specified'}
+- URL: ${repositoryContext.html_url}
+
+This repository is now the active context for all subsequent project management tasks, issue creation, and development planning.`
+    };
+
+    const responseCreateParams: any = {
+      model: deployment,
+      input: [assistantMessage],
+      stream: false,
+    };
+
+    // Add previous response ID for conversation continuity
+    if (previousResponseId) {
+      responseCreateParams.previous_response_id = previousResponseId;
+    }
+
+    const response = await aoaiClient.responses.create(responseCreateParams);
+
+    logger.info(`Repository context updated successfully. Response ID: ${response.id}`);
+    
+    return NextResponse.json({ 
+      success: true, 
+      responseId: response.id,
+      message: 'Repository context updated successfully' 
+    });
+
+  } catch (error) {
+    logger.error('Repository context update error:', error);
+    
+    return NextResponse.json(
+      { error: `Failed to update repository context: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { status: 500 }
+    );
+  }
+}
