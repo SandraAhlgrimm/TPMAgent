@@ -4,6 +4,8 @@ import { useSession, signIn, signOut } from "next-auth/react"
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useRepository } from "./context/repository"
+import { useToast } from './utils/toast'
+import { logger } from './lib/logger'
 
 interface Repository {
   id: number
@@ -21,6 +23,7 @@ interface Repository {
 export default function Repo() {
   const { data: session, status } = useSession()
   const { selectedRepository, setSelectedRepository } = useRepository()
+  const { showToast } = useToast()
   const [mcpResponse, setMcpResponse] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [repositories, setRepositories] = useState<Repository[]>([])
@@ -63,7 +66,7 @@ export default function Repo() {
       const data = await response.json()
       setMcpResponse(data)
     } catch (error) {
-      console.error('MCP request failed:', error)
+      logger.error('MCP request failed:', error)
     } finally {
       setLoading(false)
     }
@@ -83,7 +86,7 @@ export default function Repo() {
       const repos = await response.json()
       setRepositories(repos)
     } catch (error) {
-      console.error('Failed to fetch repositories:', error)
+      logger.error('Failed to fetch repositories:', error)
     } finally {
       setReposLoading(false)
     }
@@ -94,6 +97,14 @@ export default function Repo() {
       fetchRepositories()
     }
   }, [session])
+
+  const handleRepositorySelect = (repo: Repository) => {
+    // Only show toast if we're actually changing the repository
+    if (!selectedRepository || selectedRepository.id !== repo.id) {
+      setSelectedRepository(repo)
+      showToast(`Active repository set to: ${repo.full_name}`, 'success')
+    }
+  }
 
   const filteredRepositories = repositories.filter(repo =>
     repo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -229,7 +240,7 @@ export default function Repo() {
                       className={`border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer ${
                         selectedRepository?.id === repo.id ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-600' : ''
                       }`}
-                      onClick={() => setSelectedRepository(repo)}
+                      onClick={() => handleRepositorySelect(repo)}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">

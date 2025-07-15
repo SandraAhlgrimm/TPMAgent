@@ -5,6 +5,7 @@ import { streamResponses, updateRepositoryContext } from "./lib/azure-openai";
 import ReactMarkdown from 'react-markdown';
 import { useToast } from './utils/toast';
 import { useRepository } from './context/repository';
+import { logger } from './lib/logger';
 
 interface Message {
   id: string;
@@ -14,7 +15,7 @@ interface Message {
 
 export default function Chat() {
   const { showToast } = useToast();
-  const { selectedRepository } = useRepository();
+  const { selectedRepository, lastUpdatedRepositoryId, markRepositoryContextUpdated } = useRepository();
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chatMessages');
@@ -31,16 +32,23 @@ export default function Chat() {
   const [currentMessage, setCurrentMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastResponseId, setLastResponseId] = useState<string | null>(null);
-  const [lastRepositoryId, setLastRepositoryId] = useState<number | null>(null);
+  const [lastResponseId, setLastResponseId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('lastResponseId');
+    }
+    return null;
+  });
+  const [isUpdatingRepository, setIsUpdatingRepository] = useState(false);
   const chatLogRef = useRef<HTMLDivElement>(null);
 
   const clearChatHistory = async () => {
     setMessages([]);
     setError(null);
     setLastResponseId(null);
-    setLastRepositoryId(null);
     localStorage.removeItem('chatMessages');
+    localStorage.removeItem('lastResponseId');
+    // Reset repository context update tracking to force re-update when needed
+    markRepositoryContextUpdated(null);
   };
 
   const handleSend = async () => {
@@ -97,7 +105,7 @@ export default function Chat() {
           }
         }
       } catch (error) {
-        console.error('Error getting AI response:', error);
+        logger.error('Error getting AI response:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
         setError(errorMessage);
         
@@ -136,42 +144,45 @@ export default function Chat() {
     localStorage.setItem('chatMessages', JSON.stringify(messages));
   }, [messages]);
 
+  useEffect(() => {
+    if (lastResponseId) {
+      localStorage.setItem('lastResponseId', lastResponseId);
+    } else {
+      localStorage.removeItem('lastResponseId');
+    }
+  }, [lastResponseId]);
+
   // Handle repository changes
   useEffect(() => {
-    console.log('Repository effect triggered:', {
-      selectedRepository: selectedRepository?.id,
-      lastRepositoryId,
-      hasChanged: selectedRepository && selectedRepository.id !== lastRepositoryId
-    });
-    
-    if (selectedRepository && selectedRepository.id !== lastRepositoryId) {
-      console.log('Updating repository context from', lastRepositoryId, 'to', selectedRepository.id);
+    if (selectedRepository && 
+        selectedRepository.id !== lastUpdatedRepositoryId && 
+        !isUpdatingRepository) {
+      setIsUpdatingRepository(true);
       
       // Update repository context when it changes
       updateRepositoryContext(selectedRepository, lastResponseId || undefined)
         .then((result) => {
-          console.log('Repository context update result:', result);
-          
           if (result.success) {
-            console.log('Setting lastRepositoryId to:', selectedRepository.id);
-            setLastRepositoryId(selectedRepository.id);
+            markRepositoryContextUpdated(selectedRepository.id);
             // Important: Update lastResponseId with the new response ID from developer message
             if (result.responseId) {
-              console.log('Updating lastResponseId to:', result.responseId);
               setLastResponseId(result.responseId);
             }
-            showToast('Repository context updated', 'success');
+            // Note: No toast here - toast is shown when repository is selected in repo.tsx
           } else {
-            console.error('Failed to update repository context:', result.error);
+            logger.error('Failed to update repository context:', result.error);
             showToast('Failed to update repository context', 'error');
           }
         })
         .catch((error) => {
-          console.error('Repository context update error:', error);
+          logger.error('Repository context update error:', error);
           showToast('Failed to update repository context', 'error');
+        })
+        .finally(() => {
+          setIsUpdatingRepository(false);
         });
     }
-  }, [selectedRepository, lastRepositoryId, lastResponseId, showToast]);
+  }, [selectedRepository, lastUpdatedRepositoryId, isUpdatingRepository, showToast]);
 
   const saveConversationAsMarkdown = () => {
     if (messages.length === 0) {
