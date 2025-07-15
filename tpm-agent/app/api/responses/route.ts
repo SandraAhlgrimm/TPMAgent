@@ -210,7 +210,6 @@ export async function PUT(request: NextRequest) {
     }
 
     logger.info(`Updating repository context for: ${repositoryContext.full_name}`);
-    logger.debug('Repository context details:', repositoryContext);
 
     const assistantMessage = {
       role: 'assistant',

@@ -1,11 +1,6 @@
 // Client-side Azure OpenAI integration via API routes
 import { logger } from './logger';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 interface RepositoryContext {
   id: number;
   name: string;
