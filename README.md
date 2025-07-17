@@ -44,8 +44,6 @@ TPMAgent aims to:
 
 - `prompts`: contains the seed prompts and corresponding results to create the initial project. You can see the resulting issues in the [associated GitHub project](https://github.com/orgs/MSWorkStuff/projects/1)
 
-- `project_src`: contains just applying the prompts provided blindly with minimal research. This folder is just there to preserve history and serve as a warning on how to **not** use this project.
-
 - `tpm-agent`: is a more conscientious attempt at implementing this. This contains a next.js app that so far:
   - Allows users to use GitHub login
   - Tests connection to [GitHub officially hosted MCP server](https://github.com/github/github-mcp-server)
