@@ -1,27 +1,11 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRepository } from "./context/repository"
+import Image from "next/image"
+import { fetchIssues as fetchIssuesFromApi, type Issue } from "@/lib/issues-client"
 
-interface Issue {
-  id: number
-  number: number
-  title: string
-  body: string | null
-  state: string
-  html_url: string
-  created_at: string
-  updated_at: string
-  user: {
-    login: string
-    avatar_url: string
-  }
-  labels: Array<{
-    name: string
-    color: string
-  }>
-}
 
 export default function RepoIssues() {
   const { data: session } = useSession()
@@ -29,36 +13,26 @@ export default function RepoIssues() {
   const [issues, setIssues] = useState<Issue[]>([])
   const [loading, setLoading] = useState(false)
 
-  const fetchIssues = async () => {
+const fetchIssues = useCallback(async () => {
     if (!selectedRepository || !session) return
     
     setLoading(true)
     try {
-      const response = await fetch(`https://api.github.com/repos/${selectedRepository.full_name}/issues?state=all&per_page=50`, {
-        headers: {
-          'Authorization': `token ${session.accessToken}`,
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch issues: ${response.status}`)
-      }
-      
-      const issuesData = await response.json()
+      const [owner, repo] = selectedRepository.full_name.split("/");
+      const issuesData = await fetchIssuesFromApi(owner, repo)
       setIssues(issuesData)
     } catch (error) {
       console.error('Failed to fetch issues:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedRepository, session])
 
   useEffect(() => {
     if (selectedRepository && session) {
       fetchIssues()
     }
-  }, [selectedRepository, session])
+  }, [selectedRepository, session, fetchIssues])
 
   if (!selectedRepository) {
     return (
@@ -142,9 +116,11 @@ export default function RepoIssues() {
                   
                   <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
                     <div className="flex items-center gap-1">
-                      <img 
+                    <Image 
                         src={issue.user.avatar_url} 
                         alt={issue.user.login}
+                        width={16}
+                        height={16}
                         className="w-4 h-4 rounded-full"
                       />
                       <span>{issue.user.login}</span>
