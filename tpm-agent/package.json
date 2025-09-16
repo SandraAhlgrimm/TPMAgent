@@ -11,6 +11,7 @@
   "dependencies": {
     "@azure/identity": "latest",
     "@azure/openai": "^2.0.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@tailwindcss/typography": "^0.5.16",
     "next": "15.3.5",
     "next-auth": "^4.24.11",
