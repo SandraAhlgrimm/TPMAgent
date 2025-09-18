@@ -5,6 +5,7 @@ import { streamResponses, updateRepositoryContext } from "@/lib/azure-openai";
 import ReactMarkdown from 'react-markdown';
 import { useToast } from './utils/toast';
 import { useRepository } from './context/repository';
+import { useO365Integration } from './hooks/useO365Integration';
 import { logger } from '@/lib/logger';
 
 interface Message {
@@ -16,6 +17,7 @@ interface Message {
 export default function Chat() {
   const { showToast } = useToast();
   const { selectedRepository, lastUpdatedRepositoryId, markRepositoryContextUpdated } = useRepository();
+  const { sendEmail, createPresentation, scheduleMeeting } = useO365Integration();
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chatMessages');
@@ -53,20 +55,164 @@ export default function Chat() {
 
   const handleSend = async () => {
     if (currentMessage.trim() && !isLoading) {
+      const messageContent = currentMessage; // Store the message before clearing
+      const userMessage: Message = { 
+        id: `user-${Date.now()}-${Math.random()}`,
+        role: 'user', 
+        content: messageContent 
+      };
+      
       setCurrentMessage("");
       setIsLoading(true);
       setError(null);
 
-      try {
-        // Add user message to local state for immediate display
-        const userMessage: Message = { 
-          id: `user-${Date.now()}-${Math.random()}`,
-          role: 'user', 
-          content: currentMessage 
-        };
+      // Check for O365 commands first (using stored messageContent)
+      const lowerMessage = messageContent.toLowerCase();
+      
+      // Handle email requests
+      if ((lowerMessage.includes('send') && lowerMessage.includes('email')) || 
+          lowerMessage.includes('send email')) {
+        // Add user message for O365 commands
         setMessages(prev => [...prev, userMessage]);
         
-        // Add empty assistant message
+        try {
+          // Extract email address if provided, otherwise use default
+          const emailMatch = messageContent.match(/[\w._%+-]+@[\w.-]+\.[A-Za-z]{2,}/);
+          const to = emailMatch ? [emailMatch[0]] : ['sakriema@microsoft.com'];
+          
+          let subject = 'Project Status Update from TPM Agent';
+          let body = `
+            <h1>Project Status Update</h1>
+            <p>This email was sent via TPM Agent with O365 integration.</p>
+            <h2>Key Updates</h2>
+            <ul>
+              <li>Repository analysis completed</li>
+              <li>O365 integration functional</li>
+              <li>AI-powered project management operational</li>
+            </ul>
+            <p>Best regards,<br>TPM Agent</p>
+          `;
+
+          // Try to extract subject from message
+          const subjectMatch = messageContent.match(/subject[:\s]+"([^"]+)"/i);
+          if (subjectMatch) {
+            subject = subjectMatch[1];
+          }
+
+          const result = await sendEmail(to, subject, body);
+          
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}-${Math.random()}`,
+            role: 'assistant',
+            content: result.success 
+              ? `✅ **Email sent successfully!**\n\n**Recipients:** ${to.join(', ')}\n**Subject:** ${subject}\n\nThe email has been delivered with project status information.`
+              : `❌ **Failed to send email.**\n\n**Error:** ${result.error}\n\nPlease check your O365 configuration and try again.`
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          logger.error('Error handling email command:', error);
+        }
+      }
+      
+      // Handle presentation requests
+      if (lowerMessage.includes('presentation') || lowerMessage.includes('powerpoint') || 
+          (lowerMessage.includes('create') && lowerMessage.includes('slides'))) {
+        // Add user message for O365 commands
+        setMessages(prev => [...prev, userMessage]);
+        
+        try {
+          const slides = [
+            { 
+              title: 'Project Status Update', 
+              content: 'TPM Agent - High-Level Status for Stakeholders\nDate: ' + new Date().toLocaleDateString()
+            },
+            { 
+              title: 'Project Overview', 
+              content: 'Objectives:\n• Automate project management with AI\n• Integrate GitHub and O365 capabilities\n• Enhance team productivity\n\nScope:\n• Repository management\n• Task automation\n• Communication tools'
+            },
+            { 
+              title: 'Current Progress', 
+              content: 'Completed:\n✅ Repository setup\n✅ GitHub integration\n✅ O365 integration\n✅ AI capabilities\n\nIn Progress:\n🔄 Testing & refinement\n🔄 Documentation'
+            },
+            { 
+              title: 'Key Metrics', 
+              content: 'Implementation:\n• Components: 15+\n• API endpoints: 5\n• Integrations: GitHub, Azure OpenAI, O365\n\nCapabilities:\n• Email automation\n• Presentation generation\n• Meeting scheduling\n• Task management'
+            },
+            { 
+              title: 'Risks & Mitigation', 
+              content: 'Identified Risks:\n• API rate limits → Implement caching\n• Authentication complexity → Enhanced error handling\n• User adoption → Comprehensive documentation\n\nMitigation strategies in place for all identified risks.'
+            },
+            { 
+              title: 'Next Steps', 
+              content: 'Immediate priorities:\n1. Complete test suite implementation\n2. Enhance error handling\n3. User documentation\n4. Production deployment preparation\n\nTimeline: Q4 2025'
+            }
+          ];
+          
+          const result = await createPresentation('Project Status Update', slides);
+          
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}-${Math.random()}`,
+            role: 'assistant',
+            content: result.success 
+              ? `✅ **PowerPoint presentation created successfully!**\n\n**Title:** Project Status Update\n**Slides:** ${slides.length}\n\nThe presentation includes:\n• Project overview and objectives\n• Current progress and metrics\n• Risk assessment and mitigation\n• Next steps and timeline\n\nYou can find it in your OneDrive or SharePoint.`
+              : `❌ **Failed to create presentation.**\n\n**Error:** ${result.error}\n\nPlease check your O365 configuration and try again.`
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          logger.error('Error handling presentation command:', error);
+        }
+      }
+      
+      // Handle meeting requests
+      if ((lowerMessage.includes('schedule') && lowerMessage.includes('meeting')) || 
+          lowerMessage.includes('create meeting') || lowerMessage.includes('book meeting')) {
+        // Add user message for O365 commands
+        setMessages(prev => [...prev, userMessage]);
+        
+        try {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setHours(14, 0, 0, 0);
+          
+          const endTime = new Date(tomorrow);
+          endTime.setHours(15, 0, 0, 0);
+          
+          const result = await scheduleMeeting(
+            'Sprint Planning Meeting - TPM Agent',
+            tomorrow,
+            endTime,
+            ['team@microsoft.com'],
+            'Agenda:\n1. Review sprint goals\n2. Task estimation and assignment\n3. Resource allocation\n4. Timeline review\n\nGenerated by TPM Agent'
+          );
+          
+          const assistantMessage: Message = {
+            id: `assistant-${Date.now()}-${Math.random()}`,
+            role: 'assistant',
+            content: result.success 
+              ? `✅ **Meeting scheduled successfully!**\n\n**Subject:** Sprint Planning Meeting - TPM Agent\n**Date:** ${tomorrow.toLocaleDateString()}\n**Time:** 2:00 PM - 3:00 PM\n**Attendees:** team@microsoft.com\n\nA Teams link has been included in the meeting invite.`
+              : `❌ **Failed to schedule meeting.**\n\n**Error:** ${result.error}\n\nPlease check your O365 configuration and try again.`
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+          setIsLoading(false);
+          return;
+        } catch (error) {
+          logger.error('Error handling meeting command:', error);
+        }
+      }
+
+      // If not an O365 command, proceed with regular AI chat
+      try {
+        // Add user message to messages (using the stored messageContent)
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Add empty assistant message for streaming
         const assistantMessage: Message = { 
           id: `temp-${Date.now()}-${Math.random()}`,
           role: 'assistant', 
@@ -76,7 +222,7 @@ export default function Chat() {
         
         let accumulatedContent = '';
         const stream = streamResponses(
-          currentMessage, 
+          messageContent,  // Use stored messageContent instead of currentMessage 
           lastResponseId || undefined
         );
         

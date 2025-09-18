@@ -14,20 +14,23 @@ const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
 
 // Validate required environment variables
-if (!endpoint) {
-  logger.error('AZURE_OPENAI_ENDPOINT environment variable is required but not set');
+if (!endpoint || endpoint.includes('your-resource')) {
+  logger.warn('AZURE_OPENAI_ENDPOINT not properly configured (using placeholder value)');
 }
 
-if (!apiKey) {
-  logger.error('AZURE_OPENAI_API_KEY environment variable is required but not set');
+if (!apiKey || apiKey.includes('your-azure-openai-api-key')) {
+  logger.warn('AZURE_OPENAI_API_KEY not properly configured (using placeholder value)');
 }
 
-const aoaiClient = endpoint && apiKey ? new AzureOpenAI({ 
-  endpoint,  
-  apiKey,
-  deployment, 
-  apiVersion,
-}) : null;
+const aoaiClient = (endpoint && apiKey && 
+                   !endpoint.includes('your-resource') && 
+                   !apiKey.includes('your-azure-openai-api-key')) ? 
+  new AzureOpenAI({ 
+    endpoint,  
+    apiKey,
+    deployment, 
+    apiVersion,
+  }) : null;
 
 
 function isRecord(x: unknown): x is Record<string, unknown> {
@@ -47,8 +50,12 @@ export async function POST(request: NextRequest) {
 
     if (!aoaiClient) {
       return NextResponse.json(
-        { error: 'Azure OpenAI client not configured. Check environment variables.' },
-        { status: 500 }
+        { 
+          error: 'AI Chat not available - Azure OpenAI not configured', 
+          message: 'Please configure Azure OpenAI environment variables to enable AI chat features. O365 integration is still available.',
+          o365Available: true
+        },
+        { status: 503 }
       );
     }
 

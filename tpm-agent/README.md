@@ -72,6 +72,11 @@ AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
 AZURE_TENANT_ID=your-azure-tenant-id
 AZURE_CLIENT_ID=your-azure-app-client-id
 AZURE_CLIENT_SECRET=your-azure-app-client-secret
+
+# O365 Default Configuration
+# Set these to your actual Microsoft 365 email addresses
+O365_DEFAULT_SENDER=your-email@company.com
+O365_DEFAULT_ORGANIZER=your-email@company.com
 ```
 
 ### Setup Instructions

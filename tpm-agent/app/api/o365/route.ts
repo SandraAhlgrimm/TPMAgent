@@ -112,8 +112,7 @@ export async function POST(request: NextRequest) {
 
         const presentation = await graphClient.createPowerPointPresentation(
           title,
-          slides,
-          templateType
+          slides
         );
         
         logger.info(`PowerPoint created: ${presentation.name}`);
