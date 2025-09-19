@@ -50,7 +50,7 @@ async function testEmailRequest() {
     console.log(`Method: POST`);
     console.log(`URL: https://graph.microsoft.com/v1.0${endpoint}`);
     console.log(`Headers:`);
-    console.log(`  Authorization: Bearer ${tokenResponse.token.substring(0, 20)}...`);
+    console.log(`  Authorization: Bearer ${tokenResponse.token}`);
     console.log(`  Content-Type: application/json`);
     console.log(`  User-Agent: TPM-Agent/1.0`);
     console.log(`\nRequest Body:`);
